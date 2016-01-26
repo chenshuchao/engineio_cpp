@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="static/css/style.css" rel="stylesheet">
+    <script type="text/javascript" src="static/jquery-1.6.1.min.js"></script>
+    <script type="text/javascript" src="static/engine.io.js"></script>
+<script>
+  var socket = new eio.Socket('ws://10.211.55.6:5011/');
+  socket.on('open', function(){
+    socket.on('message', function(data){
+      $('#lines').append($('<p>').append($('<em>').text(data)));
+    });
+    socket.on('close', function(){});
+  });
+
+// DOM manipulation
+$(function () {
+    $('#set-nickname').submit(function (ev) {
+        socket.emit('nickname', $('#nick').val(), function (set) {
+            if (!set) {
+                clear();
+                return $('#chat').addClass('nickname-set');
+            }
+            $('#nickname-err').css('visibility', 'visible');
+        });
+        return false;
+    });
+
+    $('#send-message').submit(function () {
+	    message('me', $('#message').val());
+        // TODO
+	    socket.emit('user message', $('#message').val());
+	    clear();
+	    $('#lines').get(0).scrollTop = 10000000;
+	    return false;
+    });
+
+    function clear () {
+        $('#message').val('').focus();
+    };
+});
+    </script>
+  </head>
+<body>
+  <div id="chat">
+    <div id="nickname">
+      <form id="set-nickname" class="wrap">
+        <p>Please type in your nickname and press enter.</p>
+        <input id="nick">
+        <p id="nickname-err">Nickname already in use</p>
+    </form>
+    </div>
+    <div id="connecting">
+      <div class="wrap">Connecting to socket.io server</div>
+    </div>
+    <div id="messages">
+      <div id="nicknames"><span>Online:</span></div>
+      <div id="lines"></div>
+    </div>
+    <form id="send-message">
+      <input id="message">
+      <button>Send</button>
+    </form>
+  </div>
+</body>
+</html>

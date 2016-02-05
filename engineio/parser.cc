@@ -32,3 +32,8 @@ void EngineIOParser::EncodePacket(const EngineIOPacket& packet, string& data) {
   data.append(packet.GetData()); 
 }
 
+void EngineIOParser::EncodePayload(const EngineIOPacket& packet, string& data) {
+  EncodePacket(packet, data);
+  data = int_to_string(data.size()) + ":" + data;
+}
+

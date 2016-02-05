@@ -1,28 +1,101 @@
-#include <sstream>
-#include <map>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
+#include <vector>
 
-using boost::property_tree::ptree;
-using boost::property_tree::read_json;
-using boost::property_tree::write_json;
+#include "engineio/base/rapidjson/document.h"
+#include "engineio/base/rapidjson/prettywriter.h"
 
-void Json2Map(std::string& json, std::map<std::string, std::string>& m) {
-  ptree pt;
-  std::istringstream is(json);
-  read_json(is, pt);
-  for (ptree::const_iterator it = pt.begin(); it != pt.end(); it ++) {
-    m[it->first] = it->second;
+namespace engineio {
+
+class JsonCodec {
+ public:
+  JsonCodec() : d_() {
+    d_.Parse("{}");
   }
+
+  std::string Stringify() {
+    rapidjson::StringBuffer sb;
+    rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+    d_.Accept(writer);
+    return sb.GetString();
+  }
+
+  void Parse(const char* json) {
+    // try catch
+    d_.Parse(json);
+  }
+
+  JsonCodec& Add(std::string key, int value) {
+    // key not empty
+    rapidjson::Value k;
+    k.SetString(key.c_str(),
+                static_cast<rapidjson::SizeType>(key.size()),
+                d_.GetAllocator());
+    rapidjson::Value v;
+    v.SetInt(value);
+    d_.AddMember(k, v, d_.GetAllocator());
+    return *this;
+  }
+
+  JsonCodec& Add(std::string key, const char* value) {
+    rapidjson::Value k;
+    k.SetString(key.c_str(),
+                static_cast<rapidjson::SizeType>(key.size()),
+                d_.GetAllocator());
+    rapidjson::Value v;
+    v.SetString(value,
+                static_cast<rapidjson::SizeType>(strlen(value)),
+                d_.GetAllocator());
+    d_.AddMember(k, v, d_.GetAllocator());
+    return *this;
+  }
+
+  JsonCodec& Add(std::string key, std::string value) {
+    Add(key, value.c_str());
+    return *this;
+  }
+
+  JsonCodec& Add(std::string key, std::vector<int>& vec) {
+    rapidjson::Value k;
+    k.SetString(key.c_str(),
+                static_cast<rapidjson::SizeType>(key.size()),
+                d_.GetAllocator());
+    rapidjson::Value v;
+    v.SetArray();
+    for (int i = 0, size = vec.size(); i < size; i ++) {
+      rapidjson::Value element;
+      element.SetInt(vec[i]);
+      v.PushBack(element, d_.GetAllocator());
+    }
+    d_.AddMember(k, v, d_.GetAllocator());
+    return *this;
+  }
+
+  JsonCodec& Add(std::string key, std::vector<std::string>& vec) {
+    rapidjson::Value k;
+    k.SetString(key.c_str(),
+                static_cast<rapidjson::SizeType>(key.size()),
+                d_.GetAllocator());
+    rapidjson::Value v;
+    v.SetArray();
+    for (int i = 0, size = vec.size(); i < size; i ++) {
+      rapidjson::Value element;
+      element.SetString(vec[i].c_str(),
+                        static_cast<rapidjson::SizeType>(vec[i].size()),
+                        d_.GetAllocator());
+      v.PushBack(element, d_.GetAllocator());
+    }
+    d_.AddMember(k, v, d_.GetAllocator());
+    return *this;
+  }
+
+  int GetInt(std::string key) {
+    return d_[key.c_str()].GetInt();
+  }
+  std::string GetString(std::string key) {
+    return d_[key.c_str()].GetString();
+  }
+
+ private:
+  rapidjson::Document d_;
+};
 }
 
-std::string Map2json (const std::map<std::string, std::string>& m) {
-  ptree pt;
-  std::map<std::string, std::string>::const_iterator it;
-  for (it = m.begin(); it != m.end(); it ++) {
-    pt.put(it->first, it->second);
-  }
-  std::ostringstream buf; 
-  write_json (buf, pt, false); 
-  return buf.str();
-}

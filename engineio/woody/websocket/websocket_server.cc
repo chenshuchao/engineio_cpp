@@ -41,37 +41,6 @@ void WebsocketServer::OnCreateOrDestroyConnection(
 }
 
 void WebsocketServer::OnConnection(const muduo::net::TcpConnectionPtr& conn) {
-  CreateHandler(conn);
-}
-
-void WebsocketServer::OnDisconnection(const muduo::net::TcpConnectionPtr& conn) {
-  WebsocketHandlerPtr handler = FindHandler(conn);
-  if (!handler) {
-    LOG_ERROR << "WebsocketServer::OnDisconnection [" << name_
-              << "] connection [" << conn->name()
-              << " handler not found.";
-  }
-  RemoveHandler(handler);
-}
-
-void WebsocketServer::OnData(const muduo::net::TcpConnectionPtr& conn,
-                        muduo::net::Buffer* buf,
-                        muduo::Timestamp) {
-  WebsocketHandlerPtr handler = FindHandler(conn);
-  if (!handler) {
-    LOG_ERROR << "WebsocketServer::OnData [" << name_
-              << "] connecton [" << conn->name()
-              << " handler not found.";
-    return;
-  }
-  handler->OnData(buf);
-}
-
-void WebsocketServer::OnHandlerError(const WebsocketHandlerPtr& handler) {
-  tcp_server_.removeAndDestroyConnection(handler->GetConn());
-}
-
-void WebsocketServer::CreateHandler(const muduo::net::TcpConnectionPtr& conn) {
   string conn_name = convert_to_std(conn->name());
   WebsocketHandlerPtr handler(new WebsocketHandler(conn_name, conn));
   handler->SetRequestCompleteCallback(
@@ -86,17 +55,45 @@ void WebsocketServer::CreateHandler(const muduo::net::TcpConnectionPtr& conn) {
       boost::bind(&WebsocketServer::OnPingMessage, this, _1, _2));
   handler->SetPongMessageCallback(
       boost::bind(&WebsocketServer::OnPongMessage, this, _1, _2));
-  handler->SetErrorCallback(
-      boost::bind(&WebsocketServer::OnHandlerError, this, _1));
+  handler->SetOnCloseCallback(
+      boost::bind(&WebsocketServer::OnHandlerClose, this, _1));
+  handler->SetForceCloseCallback(
+      boost::bind(&WebsocketServer::OnHandlerForceClose, this, _1));
   handler_map_.insert(
       pair<string, WebsocketHandlerPtr>(conn_name, handler));
 }
 
-void WebsocketServer::RemoveHandler(const WebsocketHandlerPtr& handler) {
-  handler_map_.erase(convert_to_std(handler->GetConn()->name()));
+void WebsocketServer::OnDisconnection(const muduo::net::TcpConnectionPtr& conn) {
+  WebsocketHandlerPtr handler = handler_map_[convert_to_std(conn->name())];
+  if (!handler) {
+    LOG_ERROR << "WebsocketServer::OnDisconnection [" << name_
+              << "] connection [" << conn->name()
+              << " handler not found.";
+  }
+  handler->OnClose();
 }
 
-WebsocketHandlerPtr WebsocketServer::FindHandler(const muduo::net::TcpConnectionPtr& conn) {
-  return handler_map_[convert_to_std(conn->name())];
+void WebsocketServer::OnData(const muduo::net::TcpConnectionPtr& conn,
+                        muduo::net::Buffer* buf,
+                        muduo::Timestamp) {
+  WebsocketHandlerPtr handler = handler_map_[convert_to_std(conn->name())];
+  if (!handler) {
+    LOG_ERROR << "WebsocketServer::OnData [" << name_
+              << "] connecton [" << conn->name()
+              << " handler not found.";
+    return;
+  }
+  handler->OnData(buf);
+}
+
+void WebsocketServer::OnHandlerClose(const WebsocketHandlerPtr& handler) {
+  LOG_DEBUG << "WebsocketServer::OnHandlerClose - "
+            << handler->GetName();
+  handler_map_.erase(convert_to_std(handler->GetConn()->name()));
+  handler_close_callback_(handler);
+}
+
+void WebsocketServer::OnHandlerForceClose(const WebsocketHandlerPtr& handler) {
+  tcp_server_.removeAndDestroyConnection(handler->GetConn());
 }
 

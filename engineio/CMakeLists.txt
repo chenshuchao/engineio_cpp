@@ -5,7 +5,11 @@ SET(engineio_SRCS
   parser.cc
   server.cc
   socket.cc
-  transport.cc 
+  transport.cc
+  transports/polling.cc
+  transports/polling_xhr.cc
+  transports/polling_jsonp.cc
+  transports/websocket.cc
   )
 
 ADD_LIBRARY(engineio ${engineio_SRCS})

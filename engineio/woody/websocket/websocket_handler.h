@@ -19,20 +19,25 @@ class WebsocketHandler : public BaseHandler,
                          public boost::enable_shared_from_this<WebsocketHandler> {
  public:
   typedef boost::shared_ptr<WebsocketHandler> WebsocketHandlerPtr;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const HTTPRequest&)>
-      RequestCompleteCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const TextMessage&)> TextMessageCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const BinaryMessage&)> BinaryMessageCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const CloseMessage&)> CloseMessageCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const PingMessage&)> PingMessageCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&, const PongMessage&)> PongMessageCallback;
-  typedef boost::function<void (const WebsocketHandlerPtr&)> ErrorCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const HTTPRequest&)> RequestCompleteCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const TextMessage&)> TextMessageCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const BinaryMessage&)> BinaryMessageCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const CloseMessage&)> CloseMessageCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const PingMessage&)> PingMessageCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&,
+                                const PongMessage&)> PongMessageCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&)> OnCloseCallback;
+  typedef boost::function<void (const WebsocketHandlerPtr&)> ForceCloseCallback;
 
-  
   WebsocketHandler(const std::string& name,
                    const muduo::net::TcpConnectionPtr& conn);
   virtual ~WebsocketHandler() { }
- 
+
   int GetProtocol() { return protocol_; }
   void SetProtocol(int x) { protocol_ = x; }
 
@@ -41,10 +46,18 @@ class WebsocketHandler : public BaseHandler,
   
   virtual void OnData(muduo::net::Buffer* buf);
 
-  virtual void HandleUpgradeRequest(const HTTPRequest& req);
+  virtual bool HandleUpgradeRequest(const HTTPRequest& req);
 
   void SendResponse(HTTPResponse& resp) {
-    http_handler_.SendResponse(resp);
+    http_handler_->SendResponse(resp);
+  }
+
+  void OnHTTPHandlerClose(const HTTPHandlerPtr& handler) {
+    OnClose();
+  }
+
+  void OnHTTPHandlerForceClose(const HTTPHandlerPtr& handler) {
+    ForceClose();
   }
 
   bool SendTextMessage(const TextMessage& message);
@@ -54,7 +67,10 @@ class WebsocketHandler : public BaseHandler,
   // TODO private?
   bool SendPongMessage(const PongMessage& message);
 
- 
+  virtual void OnClose();
+
+  virtual void ForceClose();
+
   virtual void HandleError();
  
   virtual void OnTextMessage(const TextMessage& message);
@@ -87,8 +103,11 @@ class WebsocketHandler : public BaseHandler,
   void SetPongMessageCallback(const PongMessageCallback& cb) {
     pong_message_callback_ = cb;
   }
-  void SetErrorCallback(const ErrorCallback& cb) {
-    error_callback_ = cb;
+  void SetOnCloseCallback(const OnCloseCallback& cb) {
+    on_close_callback_ = cb;
+  }
+  void SetForceCloseCallback(const ForceCloseCallback& cb) {
+    force_close_callback_ = cb;
   }
 
  private:
@@ -98,14 +117,15 @@ class WebsocketHandler : public BaseHandler,
   int protocol_;
   std::vector<std::string> sub_protocols_;
   WebsocketCodec ws_codec_;
-  HTTPHandler http_handler_;
+  HTTPHandlerPtr http_handler_;
   RequestCompleteCallback request_complete_callback_;
   TextMessageCallback text_message_callback_;
   BinaryMessageCallback binary_message_callback_;
   CloseMessageCallback close_message_callback_;
   PingMessageCallback ping_message_callback_;
   PongMessageCallback pong_message_callback_;
-  ErrorCallback error_callback_;
+  OnCloseCallback on_close_callback_;
+  ForceCloseCallback force_close_callback_;
 };
 typedef boost::shared_ptr<WebsocketHandler> WebsocketHandlerPtr;
 }

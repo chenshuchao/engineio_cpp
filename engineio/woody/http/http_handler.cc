@@ -54,5 +54,18 @@ void HTTPHandler::SendResponse(HTTPResponse& resp) {
   LOG_INFO << "HTTPHandler::Send [" << GetName()
            << "] - response:\n" << msg;
   Send(msg);
+  ForceClose();
+}
+
+void HTTPHandler::OnClose() {
+  if (on_close_callback_) {
+    on_close_callback_(shared_from_this());
+  }
+}
+
+void HTTPHandler::ForceClose() {
+  if (force_close_callback_) {
+    force_close_callback_(shared_from_this());
+  }
 }
 

@@ -7,10 +7,10 @@
 namespace engineio {
 class EngineIOParser {
  public:
-  void DecodePacket(const std::string& data, EngineIOPacket& packet);
-  void DecodeBase64Packet(const std::string& data, EngineIOPacket& packet) { }
-
-  void EncodePacket(const EngineIOPacket& packet, std::string& data);
+  static void DecodePacket(const std::string& data, EngineIOPacket& packet);
+  static void DecodeBase64Packet(const std::string& data, EngineIOPacket& packet) { }
+  static void EncodePacket(const EngineIOPacket& packet, std::string& data);
+  static void EncodePayload(const EngineIOPacket& packet, std::string& data);
 
 private:
 };

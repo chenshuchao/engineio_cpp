@@ -12,6 +12,8 @@ namespace woody {
 
 class WebsocketServer {
  public:
+  typedef boost::function<void (const WebsocketHandlerPtr&)>
+      HandlerCloseCallback;
   WebsocketServer(int port, const std::string& name);
   virtual ~WebsocketServer() {}
 
@@ -19,35 +21,39 @@ class WebsocketServer {
   void Stop();
   void Bind();
 
+  void SetHandlerCloseCallback(const HandlerCloseCallback& cb) {
+    handler_close_callback_ = cb;
+  }
+
   virtual void OnRequest(const WebsocketHandlerPtr& handler, 
-                             const HTTPRequest& req) = 0;
+                         const HTTPRequest& req) = 0;
   virtual void OnWebsocketTextMessage(const WebsocketHandlerPtr& handler,
-                             const TextMessage&) = 0;
+                                      const TextMessage&) = 0;
   virtual void OnBinaryMessage(const WebsocketHandlerPtr& handler,
                                const BinaryMessage&) {}
   virtual void OnCloseMessage(const WebsocketHandlerPtr& handler,
-                               const CloseMessage&) {}
+                              const CloseMessage&) {}
   virtual void OnPingMessage(const WebsocketHandlerPtr& handler,
-                               const PingMessage&) {}
+                             const PingMessage&) {}
   virtual void OnPongMessage(const WebsocketHandlerPtr& handler,
-                               const PongMessage&) {}
+                             const PongMessage&) {}
+
  private:
   //
   void OnCreateOrDestroyConnection(const muduo::net::TcpConnectionPtr& conn);
   void OnConnection(const muduo::net::TcpConnectionPtr& conn);
   void OnDisconnection(const muduo::net::TcpConnectionPtr& conn);
   void OnData(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp);
-  //
-  void OnHandlerError(const WebsocketHandlerPtr& handler);
 
-  void CreateHandler(const muduo::net::TcpConnectionPtr& conn);
-  void RemoveHandler(const WebsocketHandlerPtr& handler);
-  WebsocketHandlerPtr FindHandler(const muduo::net::TcpConnectionPtr& conn);
+  void OnHandlerClose(const WebsocketHandlerPtr& handler);
+  void OnHandlerForceClose(const WebsocketHandlerPtr& handler);
 
   std::string name_;
   muduo::net::EventLoop loop_;
   muduo::net::TcpServer tcp_server_;
   std::map<std::string, WebsocketHandlerPtr> handler_map_;
+  HandlerCloseCallback handler_close_callback_;
+
 };
 }
 

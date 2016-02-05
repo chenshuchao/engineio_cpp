@@ -14,7 +14,8 @@ class HTTPHandler : public BaseHandler,
  public:
   typedef boost::shared_ptr<HTTPHandler> HTTPHandlerPtr;
   typedef boost::function<void (const HTTPRequest&)> RequestCompleteCallback;
-  typedef boost::function<void ()> ErrorCallback;
+  typedef boost::function<void (const HTTPHandlerPtr&)> OnCloseCallback;
+  typedef boost::function<void (const HTTPHandlerPtr&)> ForceCloseCallback;
   
   HTTPHandler(const std::string& name,
               const muduo::net::TcpConnectionPtr&);
@@ -27,18 +28,27 @@ class HTTPHandler : public BaseHandler,
   void FormatResponse(HTTPResponse& resp); 
   void SendResponse(HTTPResponse& response);
   void HandleError() {
-    error_callback_();
+    ForceClose();
   }
+
+  virtual void OnClose();
+  virtual void ForceClose();
+
   void SetRequestCompleteCallback(const RequestCompleteCallback& cb) {
     request_complete_callback_ = cb;
   }
-  void SetErrorCallback(const ErrorCallback& cb) {
-    error_callback_ = cb;
+  void SetOnCloseCallback(const OnCloseCallback& cb) {
+    on_close_callback_ = cb;
   }
+  void SetForceCloseCallback(const ForceCloseCallback& cb) {
+    force_close_callback_ = cb;
+  }
+
  private:
   HTTPCodec codec_;
   RequestCompleteCallback request_complete_callback_;
-  ErrorCallback error_callback_;
+  OnCloseCallback on_close_callback_;
+  ForceCloseCallback force_close_callback_;
 };
 typedef boost::shared_ptr<HTTPHandler> HTTPHandlerPtr;
 }

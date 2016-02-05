@@ -1,6 +1,7 @@
 #include <fstream>
 #include <string>
 
+#include <muduo/base/Logging.h>
 #include <engineio/server.h>
 
 using namespace std;
@@ -55,13 +56,14 @@ class SimpleServer : public EngineIOServer {
   }
   virtual void OnMessage(const EngineIOSocketPtr& socket,
                           const std::string& data ) {
-    socket->Send(data);
+    socket->SendMessage(data);
   }
   private:
    string root_;
 };
 
 int main() {
+  muduo::Logger::setLogLevel(muduo::Logger::DEBUG);
   SimpleServer server(5011, "SimpleServer");
   server.Start();
 }

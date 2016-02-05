@@ -4,43 +4,38 @@
     <link href="static/css/style.css" rel="stylesheet">
     <script type="text/javascript" src="static/jquery-1.6.1.min.js"></script>
     <script type="text/javascript" src="static/engine.io.js"></script>
-<script>
-  var socket = new eio.Socket('ws://10.211.55.6:5011/');
-  socket.on('open', function(){
-    socket.on('message', function(data){
-      $('#lines').append($('<p>').append($('<em>').text(data)));
-    });
-    socket.on('close', function(){});
-  });
-
-// DOM manipulation
-$(function () {
-    $('#set-nickname').submit(function (ev) {
-        socket.emit('nickname', $('#nick').val(), function (set) {
-            if (!set) {
-                clear();
-                return $('#chat').addClass('nickname-set');
-            }
-            $('#nickname-err').css('visibility', 'visible');
+    <script>
+        var socket = new eio.Socket('ws://10.211.55.6:5011/');
+        socket.on('open', function(){
+          $("#chat").addClass("connected");
+          $("#chat").addClass("nickname-set");
+          socket.on('message', function(data){
+            $('#lines').append($('<p>').append($('<em>').text(data)));
+            console.log(data);
+          });
+          socket.on('close', function(){});
         });
-        return false;
-    });
-
-    $('#send-message').submit(function () {
-	    message('me', $('#message').val());
-        // TODO
-	    socket.emit('user message', $('#message').val());
-	    clear();
-	    $('#lines').get(0).scrollTop = 10000000;
-	    return false;
-    });
-
-    function clear () {
-        $('#message').val('').focus();
-    };
-});
-    </script>
+        function message (from, msg) {
+            $('#lines').append($('<p>').append($('<b>').text(from), msg));
+        } 
+        // DOM manipulation
+        $(function () {
+            $('#send-message').submit(function () {
+        	    message('me', $('#message').val());
+                // TODO
+        	    socket.emit('message', $('#message').val());
+        	    clear();
+        	    $('#lines').get(0).scrollTop = 10000000;
+        	    return false;
+            });
+        
+            function clear () {
+                $('#message').val('').focus();
+            };
+        });
+  </script>
   </head>
+
 <body>
   <div id="chat">
     <div id="nickname">

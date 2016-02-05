@@ -11,7 +11,7 @@ WebsocketHandler::WebsocketHandler(const std::string& name,
     const muduo::net::TcpConnectionPtr& conn)
     : BaseHandler(name, conn),
       protocol_(kHTTP),
-      http_handler_(name, conn) {
+      http_handler_(new HTTPHandler(name, conn)) {
   // websocket handler
   ws_codec_.SetErrorCallback(
       boost::bind(&WebsocketHandler::HandleError, this));
@@ -28,15 +28,17 @@ WebsocketHandler::WebsocketHandler(const std::string& name,
       boost::bind(&WebsocketHandler::OnPongMessage, this, _1));
 
   // http handler
-  http_handler_.SetRequestCompleteCallback(
+  http_handler_->SetRequestCompleteCallback(
       boost::bind(&WebsocketHandler::OnRequestComplete, this, _1));
-  http_handler_.SetErrorCallback(
-      boost::bind(&WebsocketHandler::HandleError, this));
+  http_handler_->SetOnCloseCallback(
+      boost::bind(&WebsocketHandler::OnHTTPHandlerClose, this, _1));
+  http_handler_->SetForceCloseCallback(
+      boost::bind(&WebsocketHandler::OnHTTPHandlerForceClose, this, _1));
 }
 
 void WebsocketHandler::OnData(muduo::net::Buffer* buf) {
   if (GetProtocol() == kHTTP) {
-    http_handler_.OnData(buf);
+    http_handler_->OnData(buf);
     return;
   }
   // websocket protocol
@@ -58,17 +60,24 @@ void WebsocketHandler::OnData(muduo::net::Buffer* buf) {
     LOG_DEBUG << "readable bytes: " << buf->readableBytes();
   }
 }
- 
+
+void WebsocketHandler::OnClose() {
+  on_close_callback_(shared_from_this());
+}
+
+void WebsocketHandler::ForceClose() {
+  force_close_callback_(shared_from_this());
+}
+
 void WebsocketHandler::HandleError() { 
-  if (error_callback_) {
-    error_callback_(
-        enable_shared_from_this<WebsocketHandler>::shared_from_this());
-  }
+  //TODO log_error
+  ForceClose();
 }
  
-void WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
+bool WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
   if (req.GetMethod() != "GET") {
     // error
+    return false;
   }
   string v;
   if (!req.GetHeader("Upgrade", v) &&
@@ -76,6 +85,7 @@ void WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
        req.GetHeader("Connection", v) &&
        v == "upgrade") {
     // error
+    return false;
   }
 
   string key;
@@ -83,6 +93,7 @@ void WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
     string ws_key = base64_decode(key);
     if (ws_key.size() != 16) {
       //error
+      return false;
     }
   }
 
@@ -90,6 +101,7 @@ void WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
   if(req.GetHeader("Sec-WebSocket-Version", version)) {
     if(string_to_int(version) != kVersion) {
       //error
+      return false;
     }
   }
   
@@ -117,7 +129,8 @@ void WebsocketHandler::HandleUpgradeRequest(const HTTPRequest& req) {
       .AddHeader("Sec-WebSocket-Accept", accept_key)
       .SetStatus(101, "Switching Protocols");
   SetProtocol(kWebsocket);
-  http_handler_.SendResponse(resp);
+  SendResponse(resp);
+  return true;
 }
 
 void WebsocketHandler::OnRequestComplete(const HTTPRequest& req) {
@@ -125,7 +138,7 @@ void WebsocketHandler::OnRequestComplete(const HTTPRequest& req) {
 }
 
 bool WebsocketHandler::SendTextMessage(const TextMessage& message) {
-  SendWebsocketMessage(WebsocketMessage::kTextMessage, message.GetData());
+  return SendWebsocketMessage(WebsocketMessage::kTextMessage, message.GetData());
 }
 
 bool WebsocketHandler::SendWebsocketMessage(
@@ -165,3 +178,4 @@ void WebsocketHandler::OnPingMessage(const PingMessage& message) {
 void WebsocketHandler::OnPongMessage(const PongMessage& message) {
   pong_message_callback_(shared_from_this(), message);
 }
+

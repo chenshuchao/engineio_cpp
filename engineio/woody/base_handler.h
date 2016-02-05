@@ -25,7 +25,6 @@ class BaseHandler {
   virtual void Send(std::string& message) {
     conn_->send(message.c_str(), message.size());
   }
-
   /* TODO
   virtual void SetErrorCallback(const ErrorCallback& cb) {
     error_callback_ = cb;
@@ -36,6 +35,9 @@ class BaseHandler {
     }
   }
   */
+  virtual void OnClose() { }
+
+  virtual void ForceClose() { }
 
  private:
   std::string name_;

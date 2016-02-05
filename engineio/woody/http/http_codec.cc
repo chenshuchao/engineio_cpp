@@ -108,9 +108,7 @@ bool HTTPCodec::OnHeadersComplete() {
   is_headers_complete_ = true;
   string method(http_method_str(static_cast<http_method>(parser_.method)));
   request_.SetMethod(method);
-  if (method == "GET") {
-    request_.ParseUrl();
-  }
+  request_.ParseUrl();
   if (parser_.upgrade == 1) {
     request_.SetUpgrade();
   }

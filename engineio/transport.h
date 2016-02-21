@@ -6,87 +6,68 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/function.hpp>
 #include <woody/http/http_request.h>
-#include <woody/websocket/websocket_handler.h>
+#include <woody/http/http_response.h>
 #include "engineio/parser.h"
 
 namespace engineio {
 class BaseTransport {
  public:
-  typedef boost::function<void (const EngineIOPacket&)>
+  typedef boost::function<void (const Packet&)>
       PacketCompleteCallback;
-  BaseTransport(const std::string& name,
-                const woody::WebsocketHandlerPtr& handler)
+  typedef boost::function<void ()> TriggerFlushCallback;
+  BaseTransport(const std::string& name)
       : name_(name),
-        is_support_binary_(false),
-        handler_(handler) {
+        is_support_binary_(false) {
   }
-  std::string GetName() const { return name_; }
 
-  const woody::WebsocketHandlerPtr& GetHandler() const { return handler_; }
-
+  // Get All supported upgrade
+  virtual void GetAllUpgrades(std::vector<std::string>& vec) = 0;
   // Handle http request
-  void OnRequest(const woody::HTTPRequest& req) {}
+  virtual void HandleRequest(const woody::HTTPHandlerPtr& handler,
+                             const woody::HTTPRequest& req,
+                             woody::HTTPResponse& resp) = 0;
 
-  // Handle data from websocket
-  virtual void OnData(const std::string& data);
+  // Send engineio packet to transport
+  virtual void SendPackets(std::vector<Packet>& packets) = 0;
+
+  virtual void OnClose() = 0;
+
+  virtual void ForceClose() = 0;
+
+  virtual bool IsWritable() const = 0;
 
   // Called when data was decoded to packet
-  void OnPacket(const EngineIOPacket& packet) {
+  void OnPacket(const Packet& packet) {
     packet_complete_callback_(packet);
   }
-  /*
-  virtual void OnError();
-  virtual void OnClose();
-  */
+
   void SetPacketCompleteCallback(const PacketCompleteCallback& cb) {
     packet_complete_callback_ = cb;
   }
-
-  // Send engineio packet to transport
-  virtual void SendPacket(const EngineIOPacket& packet) = 0;
-
-  virtual void GetAllUpgrades(std::vector<std::string>& vec) = 0;
-
-  void SendResponse(woody::HTTPResponse& resp) {
-    handler_->SendResponse(resp);
+  void SetTriggerFlushCallback(const TriggerFlushCallback& cb) {
+    trigger_flush_callback_ = cb;
   }
 
-  void SendWebsocketMessage(const woody::TextMessage message) {
-    handler_->SendTextMessage(message);
-  }
+  std::string GetName() const { return name_; }
 
   bool IsSupportBinary() const { return is_support_binary_; }
+
   void SetSupportBinary(bool b) { is_support_binary_ = b; }
 
-  // transport which support upgrade should override this function
-  virtual bool HandleUpgrade(const woody::HTTPRequest& req) {
-    return false;
-  }
-  bool HandleUpgradeRequest(const woody::HTTPRequest& req) {
-    return handler_->HandleUpgradeRequest(req);
-  }
-  
-  void OnClose() {
-  }
-  void ForceClose() {
-    handler_->ForceClose();
+  void TriggerFlush() {
+    trigger_flush_callback_();
   }
 
  private:
+  // Handle data.
+  virtual void OnData(const std::string& data) = 0;
+
   std::string name_;
   bool is_support_binary_;
-  const woody::WebsocketHandlerPtr handler_;
   PacketCompleteCallback packet_complete_callback_;
+  TriggerFlushCallback trigger_flush_callback_;
 };
 typedef boost::shared_ptr<BaseTransport> BaseTransportPtr;
-
-class BaseTransportFactory {
- public:
-  virtual BaseTransport* Create(const woody::WebsocketHandlerPtr& handler,
-          const woody::HTTPRequest& req) = 0;
- private:
-};
-typedef boost::shared_ptr<BaseTransportFactory> BaseTransportFactoryPtr;
 }
 
 #endif

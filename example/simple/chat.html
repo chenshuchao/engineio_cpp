@@ -23,7 +23,7 @@
             $('#send-message').submit(function () {
         	    message('me', $('#message').val());
                 // TODO
-        	    socket.emit('message', $('#message').val());
+        	    socket.send($('#message').val());
         	    clear();
         	    $('#lines').get(0).scrollTop = 10000000;
         	    return false;

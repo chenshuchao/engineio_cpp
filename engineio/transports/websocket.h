@@ -1,21 +1,49 @@
 #ifndef ENGINEIO_TRANSPORTS_WEBSOCKET_H
 #define ENGINEIO_TRANSPORTS_WEBSOCKET_H
 
+#include <woody/websocket/websocket_handler.h>
 #include "engineio/transport.h"
 
 namespace engineio {
 class WebsocketTransport : public BaseTransport {
  public:
-  WebsocketTransport(const woody::WebsocketHandlerPtr& handler);
+  WebsocketTransport(const woody::HTTPHandlerPtr& handler,
+                     const woody::HTTPRequest& req,
+                     woody::HTTPResponse& resp);
+
   virtual ~WebsocketTransport() { }
-  virtual void OnData(const std::string& data);
-  virtual void OnError();
-  virtual void SendPacket(const EngineIOPacket& packet);
-  virtual void GetAllUpgrades(std::vector<std::string>& vec) { }
-  virtual bool HandleUpgrade(const woody::HTTPRequest& req) {
-    return HandleUpgradeRequest(req);
+
+  virtual void GetAllUpgrades(std::vector<std::string>& vec) {
+    // do not support upgrade
   }
+
+  virtual void HandleRequest(const woody::HTTPHandlerPtr& handler,
+                             const woody::HTTPRequest& req,
+                             woody::HTTPResponse& resp);
+
+  virtual bool IsWritable() const { return writable_; }
+
+  virtual void SendPackets(std::vector<Packet>& packets);
+
+  virtual void OnError();
+
+  virtual void OnClose() {
+    // do nothing
+  }
+
+  virtual void ForceClose() {
+    handler_->ForceClose();
+  }
+
  private:
+  virtual void OnData(const std::string& data);
+
+  void OnTextMessage(const woody::WebsocketHandlerPtr& handler,
+                     const woody::TextMessage& message);
+
+  woody::WebsocketHandlerPtr handler_;
+  bool writable_;
+  bool upgraded_;
 };
 }
 

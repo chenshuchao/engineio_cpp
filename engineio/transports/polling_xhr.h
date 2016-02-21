@@ -6,22 +6,15 @@
 namespace engineio {
 class PollingXhrTransport : public PollingTransport {
  public:
-  PollingXhrTransport(const woody::WebsocketHandlerPtr& handler)
-      : PollingTransport(handler) {
+  PollingXhrTransport(const woody::HTTPHandlerPtr& handler,
+                      const woody::HTTPRequest& req,
+                      woody::HTTPResponse& resp)
+      : PollingTransport(handler, req, resp) {
   }
   virtual ~PollingXhrTransport() { }
   virtual void DoWrite(const std::string& data);
 };
 
-/*
-class PollingXhrTransportFactory : public BaseTransportFactory {
- public:
-  PollingXhrTransport* Create(const woody::WebsocketHandlerPtr& handler) {
-    return new PollingXhrTransport(handler);
-  }
-};
-typedef boost::shared_ptr<PollingXhrTransportFactory> PollingXhrTransportFactoryPtr;
-*/
 }
 
 #endif

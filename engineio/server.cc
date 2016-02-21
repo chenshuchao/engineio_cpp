@@ -11,69 +11,42 @@ using namespace std;
 using namespace woody;
 using namespace engineio;
 
-EngineIOServer::EngineIOServer(int port, const string& name)
-    : woody::WebsocketServer(port, name),
-      cookie_("io"),
+Server::Server(const string& name) 
+    : cookie_prefix_("io"),
       pingInterval_(25000),
       pingTimeout_(60000) {
-  WebsocketServer::SetHandlerCloseCallback(
-      boost::bind(&EngineIOServer::OnHandlerClose, this, _1));
 }
 
-void EngineIOServer::OnRequest(const WebsocketHandlerPtr& handler, 
-                               const HTTPRequest& req) {
+void Server::HandleRequest(const HTTPHandlerPtr& handler, 
+                           const HTTPRequest& req,
+                           HTTPResponse& resp) {
+  // TODO url prefix
   LOG_DEBUG << "Handling http request, method: " << req.GetMethod()
             << ", url: " << req.GetUrl();
-  if (!VerifyRequest(handler, req)) return;
+  if (!VerifyRequest(handler, req, resp)) return;
   string sid;
   req.GetGETParams("sid", sid);
   string transport;
   req.GetGETParams("transport", transport);
 
   if (sid.empty()) {
-    Handshake(transport, req, handler);
+    Handshake(handler, req, resp, transport);
   } else {
-      if(req.IsUpgrade()) {
-        LOG_DEBUG << "Http request upgrade.";
-        string sid;
-        req.GetGETParams("sid", sid);
-        EngineIOSocketPtr socket = sockets_[sid];
-        if (socket->Upgrade(handler, req, transport)) {
-          string name = socket->GetTransport()->GetHandler()->GetName();
-          sockets_.erase(sid);
-          LOG_DEBUG << "EngineIOServer::OnRequest - "
-                    << "upgrade, handler name: " << name;
-          ws_sockets_[name]= socket;
-        }
-        return;
-      }
-    EngineIOSocketPtr socket = sockets_[sid];
-    socket->GetTransport()->OnRequest(req);
+    SocketPtr socket = sockets_[sid];
+    socket->HandleRequest(handler, req, resp);
   }
 }
 
-void EngineIOServer::OnWebsocketTextMessage(const WebsocketHandlerPtr& handler,
-    const TextMessage& message) {
-  map<string, EngineIOSocketPtr>::const_iterator it = 
-      ws_sockets_.find(handler->GetName());
-  if (it != ws_sockets_.end()) {
-    LOG_ERROR << "EngineIOServer::OnWebsocketTextMessage - "
-              << "error: EngineIOSocket not found.";
-    handler->HandleError();
-    return;
-  }
-  EngineIOSocketPtr socket = it->second;
-  socket->GetTransport()->OnData(message.GetData());
-}
-
-void EngineIOServer::Handshake(const string& transport_name,
-                               const HTTPRequest& req,
-                               const WebsocketHandlerPtr& handler) {
+void Server::Handshake(const HTTPHandlerPtr& handler,
+                       const HTTPRequest& req,
+                       HTTPResponse& resp,
+                       const string& transport_name) {
   // TODO
   string sid =  GenerateBase64ID();
-  LOG_DEBUG << "EngineIOServer::Handshake - "
-            << "sid : " << sid;
-  BaseTransportPtr tran(transports_.GetFactory(transport_name)->Create(handler, req));
+  LOG_DEBUG << "Server::Handshake - " << "sid : " << sid;
+
+  resp.AddHeader("Set-Cookie", cookie_prefix_ + "=" + sid);
+  BaseTransportPtr tran(transports_.GetFactory(transport_name)->Create(handler, req, resp));
   string b64;
   if (req.GetGETParams("b64", b64)) {
     tran->SetSupportBinary(false);
@@ -81,17 +54,16 @@ void EngineIOServer::Handshake(const string& transport_name,
     tran->SetSupportBinary(true);
   }
 
-  EngineIOSocketPtr socket(new EngineIOSocket(sid, tran));
-  socket->SetCloseCallback(
-      boost::bind(&EngineIOServer::OnSocketClose, this, _1));
+  SocketPtr socket(new Socket(sid, tran));
+  socket->SetCloseCallbackWithThis(
+      boost::bind(&Server::OnSocketClose, this, _1));
   socket->SetMessagePacketCallback(
-      boost::bind(&EngineIOServer::OnMessage, this, _1, _2));
+      boost::bind(&Server::OnMessage, this, _1, _2));
   socket->SetPingPacketCallback(
-      boost::bind(&EngineIOServer::OnPingMessage, this, _1, _2));
+      boost::bind(&Server::OnPingMessage, this, _1, _2));
   sockets_[sid] = socket;
 
-  tran->OnRequest(req);
-  HTTPResponse resp;
+  tran->HandleRequest(handler, req, resp);
   string body;
   JsonCodec codec;
   vector<string> upgrades;
@@ -101,15 +73,31 @@ void EngineIOServer::Handshake(const string& transport_name,
        .Add("pingInterval", pingInterval_)
        .Add("pingTimeout", pingTimeout_);
   socket->SendOpenPacket(codec.Stringify());
+  if (connection_callback_) {
+    connection_callback_(socket);
+  }
 }
 
-bool EngineIOServer::VerifyRequest(const WebsocketHandlerPtr& handler,
-                                   const woody::HTTPRequest& req) {
+void Server::OnPingMessage(const SocketPtr& socket, const string& data) {
+  if (ping_message_callback_) {
+    ping_message_callback_(socket, data);
+  }
+}
+
+void Server::OnMessage(const SocketPtr& socket, const std::string& data) {
+  if (message_callback_) {
+    message_callback_(socket, data);
+  }
+}
+
+bool Server::VerifyRequest(const HTTPHandlerPtr& handler,
+                           const HTTPRequest& req,
+                           HTTPResponse& resp) {
   string transport;
   if (!(req.GetGETParams("transport", transport) &&
        transports_.IsValid(transport))) {
     LOG_ERROR << "Unknown transport : " << transport;
-    HandleRequestError(handler, req, kUnknownTransport);
+    HandleRequestError(handler, req, resp, kUnknownTransport);
     return false;
   }
 
@@ -117,27 +105,27 @@ bool EngineIOServer::VerifyRequest(const WebsocketHandlerPtr& handler,
   req.GetGETParams("sid", sid);
   if (sid.empty()) {
     if ("GET" != req.GetMethod()) {
-      HandleRequestError(handler, req, kBadHandshakeMethod);
+      HandleRequestError(handler, req, resp, kBadHandshakeMethod);
       return false;
     }
   } else {
     if (sockets_.find(sid) == sockets_.end()) {
-      HandleRequestError(handler, req, kUnknownSid);
+      HandleRequestError(handler, req, resp, kUnknownSid);
       return false;
     }
     if (!req.IsUpgrade() &&
         sockets_[sid]->GetTransport()->GetName() != transport) {
-      HandleRequestError(handler, req, kBadRequest);
+      HandleRequestError(handler, req, resp, kBadRequest);
       return false;
     }
   }
   return true;
 }
 
-void EngineIOServer::HandleRequestError(const WebsocketHandlerPtr& handler,
-                                        const HTTPRequest& req, 
-                                        ErrorCode code) {
-  HTTPResponse resp;
+void Server::HandleRequestError(const HTTPHandlerPtr& handler,
+                                const HTTPRequest& req,
+                                HTTPResponse& resp,
+                                ErrorCode code) {
   resp.SetStatus(400, "Bad Request");
   resp.AddHeader("Content-Type", "application/json");
   string origin;
@@ -154,24 +142,12 @@ void EngineIOServer::HandleRequestError(const WebsocketHandlerPtr& handler,
   codec.Add("message", message);
 
   resp.AddBody(codec.Stringify());
-  handler->SendResponse(resp);
+  resp.End();
 }
 
-void EngineIOServer::OnHandlerClose(const WebsocketHandlerPtr& handler) {
-  LOG_DEBUG << "EngineIOServer::OnHandlerClose - "
-            << handler->GetName();
-  map<string, EngineIOSocketPtr>::const_iterator it =
-      ws_sockets_.find(handler->GetName());
-  if (it != ws_sockets_.end()) {
-    it->second->OnClose();
-  }
-}
-
-void EngineIOServer::OnSocketClose(const EngineIOSocketPtr& socket) {
-  LOG_DEBUG << "EngineIOServer::OnSocketClose - "
+void Server::OnSocketClose(const SocketPtr& socket) {
+  LOG_DEBUG << "Server::OnSocketClose - "
             << socket->GetName();
   sockets_.erase(socket->GetSid());
-  // for websocket
-  ws_sockets_.erase(socket->GetTransport()->GetHandler()->GetName());
 }
 

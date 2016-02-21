@@ -1,2 +1,0 @@
-ADD_SUBDIRECTORY(http_parser)
-ADD_SUBDIRECTORY(muduo)

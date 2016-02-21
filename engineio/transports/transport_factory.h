@@ -7,41 +7,49 @@
 #include "engineio/transports/polling_jsonp.h"
 
 namespace engineio {
+class BaseTransportFactory {
+ public:
+  virtual BaseTransport* Create(const woody::HTTPHandlerPtr& handler,
+                                const woody::HTTPRequest& req,
+                                woody::HTTPResponse& resp) = 0;
+};
+typedef boost::shared_ptr<BaseTransportFactory> BaseTransportFactoryPtr;
 
 class WebsocketTransportFactory : public BaseTransportFactory {
  public:
   WebsocketTransportFactory() : BaseTransportFactory() { }
   virtual ~WebsocketTransportFactory() { }
-  WebsocketTransport* Create(const woody::WebsocketHandlerPtr& handler,
-                             const woody::HTTPRequest& req) {
-    return new WebsocketTransport(handler);
+  WebsocketTransport* Create(const woody::HTTPHandlerPtr& handler,
+                             const woody::HTTPRequest& req,
+                             woody::HTTPResponse& resp) {
+    return new WebsocketTransport(handler, req, resp);
   }
 };
 typedef boost::shared_ptr<WebsocketTransportFactory>
     WebsocketTransportFactoryPtr;
 
-
 class PollingTransportFactory : public BaseTransportFactory {
  public:
   PollingTransportFactory() : BaseTransportFactory() { }
   virtual ~PollingTransportFactory() { }
-  PollingTransport* Create(const woody::WebsocketHandlerPtr& handler,
-                           const woody::HTTPRequest& req) {
+  PollingTransport* Create(const woody::HTTPHandlerPtr& handler,
+                           const woody::HTTPRequest& req,
+                           woody::HTTPResponse& resp) {
     std::string j;
     if (req.GetGETParams("j", j)) {
       return boost::dynamic_pointer_cast<PollingTransport>(
-          new PollingJsonpTransport(handler));
+          new PollingJsonpTransport(handler, req, resp));
     } else {
       return boost::dynamic_pointer_cast<PollingTransport>(
-          new PollingXhrTransport(handler));
+          new PollingXhrTransport(handler, req, resp));
     }
   }
 };
 typedef boost::shared_ptr<PollingTransportFactory> PollingTransportFactoryPtr;
 
-class EngineIOTransports {
+class Transports {
  public:
-  EngineIOTransports() {
+  Transports() {
     factories_["polling"] = PollingTransportFactoryPtr(
         new PollingTransportFactory());
     factories_["websocket"] = WebsocketTransportFactoryPtr(
@@ -57,6 +65,7 @@ class EngineIOTransports {
  private:
   std::map<std::string, BaseTransportFactoryPtr> factories_;
 };
+typedef boost::shared_ptr<Transports> TransportsPtr;
 }
 
 #endif

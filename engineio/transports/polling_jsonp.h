@@ -5,11 +5,13 @@ namespace engineio {
 
 class PollingJsonpTransport : public PollingTransport {
  public:
-  PollingJsonpTransport(const woody::WebsocketHandlerPtr& handler)
-      : PollingTransport(handler) {
+  PollingJsonpTransport(const woody::HTTPHandlerPtr& handler,
+                        const woody::HTTPRequest& req,
+                        woody::HTTPResponse& resp)
+      : PollingTransport(handler, req, resp) {
   }
   virtual ~PollingJsonpTransport() { }
-  void DoWrite(const std::string& data) { }
+  virtual void DoWrite(const std::string& data) { }
 
 };
 }

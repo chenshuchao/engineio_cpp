@@ -8,19 +8,30 @@
 #include "engineio/transports/transport_factory.h"
 
 namespace engineio {
-class EngineIOSocket : public boost::enable_shared_from_this<EngineIOSocket> {
+class Socket : public boost::enable_shared_from_this<Socket> {
  public:
-  typedef boost::shared_ptr<EngineIOSocket> EngineIOSocketPtr;
-  typedef boost::function<void (const EngineIOSocketPtr&)> CloseCallback;
-  typedef boost::function<void (const EngineIOSocketPtr&, const std::string&)>
+  typedef boost::shared_ptr<Socket> SocketPtr;
+  typedef boost::function<void (const SocketPtr&)> CloseCallbackWithThis;
+  typedef boost::function<void ()> CloseCallback;
+  typedef boost::function<void (const SocketPtr&, const std::string&)>
       PingPacketCallback;
-  typedef boost::function<void (const EngineIOSocketPtr&, const std::string&)>
+  typedef boost::function<void (const SocketPtr&, const std::string&)>
       MessagePacketCallback;
+  enum State {
+    kStateOpening,
+    kStateOpen,
+    kStateUpgrading,
+    kStateClosing,
+    kStateClose,
+  };
 
-  EngineIOSocket(const std::string sid, const BaseTransportPtr& tran);
+  Socket(const std::string sid,
+         const BaseTransportPtr& tran);
 
   std::string GetName() const { return name_; }
+
   std::string GetSid() const { return sid_; }
+
   BaseTransportPtr GetTransport() const { return transport_; }
   
   void SetTransport(const BaseTransportPtr& tran);
@@ -28,49 +39,66 @@ class EngineIOSocket : public boost::enable_shared_from_this<EngineIOSocket> {
   void SetCloseCallback(const CloseCallback& cb) {
     close_callback_ = cb;
   }
+  void SetCloseCallbackWithThis(const CloseCallbackWithThis& cb) {
+    close_callback_with_this_ = cb;
+  }
   void SetMessagePacketCallback(const MessagePacketCallback& cb) {
     message_packet_callback_ = cb;
   }
   void SetPingPacketCallback(const PingPacketCallback& cb) {
     ping_packet_callback_ = cb;
   }
-  // Called when packet was send from transport
-  void OnPacket(const EngineIOPacket& packet);
-  // Handle ping packet
-  void OnPingPacket(const EngineIOPacket& packet);
-  // Handle message packet
-  void OnMessagePacket(const EngineIOPacket& packet);
 
-  // TODO
+  void HandleRequest(const woody::HTTPHandlerPtr& handler,
+                     const woody::HTTPRequest& req,
+                     woody::HTTPResponse& resp);
+
   void SendOpenPacket(const std::string& data) {
-    CreateAndSendPacket(EngineIOPacket::kPacketOpen, data);
+    CreateAndSendPacket(Packet::kPacketOpen, data);
   }
   void SendMessage(const std::string& data) {
-    CreateAndSendPacket(EngineIOPacket::kPacketMessage, data);
+    CreateAndSendPacket(Packet::kPacketMessage, data);
   }
-  void CreateAndSendPacket(int packet_type, const std::string& data);
 
-  bool Upgrade(const woody::WebsocketHandlerPtr& handler,
-               const woody::HTTPRequest& req,
-               std::string transport_name);
+  void ForceClose();
 
   void OnClose();
 
-  void ForceClose() {
-    transport_->ForceClose();
-  }
-
  private:
+  // Called when packet was send from transport
+  void OnPacket(const Packet& packet);
+  // Handle ping packet
+  void OnPingPacket(const Packet& packet);
+  // Handle message packet
+  void OnMessagePacket(const Packet& packet);
+
+  void OnUpgradePacket(const Packet& packet);
+
+  void CreateAndSendPacket(int packet_type, const std::string& data);
+
+  bool MaybeUpgrade(const woody::HTTPHandlerPtr& handler,
+                    const woody::HTTPRequest& req,
+                    woody::HTTPResponse& resp);
+  void Flush();
+
   std::string name_;
   std::string sid_;
+  State state_;
   BaseTransportPtr transport_;
+  BaseTransportPtr upgrading_transport_;
+  Transports transports_;
+
   CloseCallback close_callback_;
+  CloseCallbackWithThis close_callback_with_this_;
+  
   PingPacketCallback ping_packet_callback_;
   MessagePacketCallback message_packet_callback_;
   bool upgraded_;
-  EngineIOTransports transports_;
+ 
+  // TODO
+  std::vector<Packet> write_buffer_;
 };
-typedef boost::shared_ptr<EngineIOSocket> EngineIOSocketPtr;
+typedef boost::shared_ptr<Socket> SocketPtr;
 }
 
 #endif

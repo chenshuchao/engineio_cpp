@@ -2,7 +2,7 @@
 #define ENGINEIO_PACKET_H
 
 namespace engineio {
-class EngineIOPacket {
+class Packet {
  public:
   static const int kPacketOpen = 0;
   static const int kPacketClose = 1;

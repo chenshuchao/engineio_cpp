@@ -2,28 +2,26 @@
 #include <string>
 
 #include <muduo/base/Logging.h>
+#include <woody/http/http_server.h>
 #include <engineio/server.h>
 
 using namespace std;
 using namespace woody;
-using namespace engineio;
 
 bool IsStringEndWith(string s, string p) {
   return s.find(p) == (s.size() - p.size());
 }
 
-class SimpleServer : public EngineIOServer {
+class FileApp : public HTTPApplication {
  public:
-  SimpleServer(int port, const std::string& name)
-      : EngineIOServer(port, name),
-        root_("/home/shuchao/Documents/github/engineio_cpp/example/simple") {
+  FileApp() : root_("/home/shuchao/Documents/github/engineio_cpp/example/simple") {
   }
-  virtual ~SimpleServer() { }
+  virtual ~FileApp() { }
 
-  virtual void OnRequest(const WebsocketHandlerPtr& handler,
-                         const HTTPRequest& req) {
+  virtual void HandleRequest(const HTTPHandlerPtr& handler,
+                             const HTTPRequest& req,
+                             HTTPResponse& resp) {
     string url = req.GetUrl();
-    HTTPResponse resp;
     if (url == "/chat.html" || url.find("/static/") == 0) {
       string abs_url = root_ + "/" + url;
       ifstream ifs(abs_url.c_str());
@@ -31,7 +29,7 @@ class SimpleServer : public EngineIOServer {
                           (std::istreambuf_iterator<char>()));
       string content_type;
       if (IsStringEndWith(url, ".js")) {
-        content_type = "text/javascript";
+        content_type = "application/javascript";
       } else if (IsStringEndWith(url, ".css")) {
         content_type = "text/css";
       } else if (IsStringEndWith(url, ".swf")) {
@@ -42,29 +40,33 @@ class SimpleServer : public EngineIOServer {
       resp.SetStatus(200, "OK")
           .AddHeader("Content-Type", content_type)
           .AddBody(content);
-      handler->SendResponse(resp);
+      resp.End();
       return;
     }
 
-    if (url.find("/engine.io") == 0) {
-      EngineIOServer::OnRequest(handler, req);
-      return;
-    }
-    
     resp.SetStatus(404, "Not Found");
-    handler->SendResponse(resp);
+    resp.End();
   }
-  virtual void OnMessage(const EngineIOSocketPtr& socket,
-                          const std::string& data ) {
-    socket->SendMessage(data);
-  }
+
   private:
    string root_;
 };
 
+void HandleMessage(const engineio::SocketPtr& socket, const string& data) {
+  socket->SendMessage(data + " from server.");
+}
+
 int main() {
   muduo::Logger::setLogLevel(muduo::Logger::DEBUG);
-  SimpleServer server(5011, "SimpleServer");
-  server.Start();
+
+  engineio::Server eio_server("EngineIOServer");
+  eio_server.SetMessageCallback(boost::bind(&HandleMessage, _1, _2));
+
+  FileApp file_app;
+
+  HTTPServer http_server(5011, "SimpleServer");
+  http_server.Handle("/engine.io", &eio_server);
+  http_server.Handle("/", &file_app);
+  http_server.Start();
 }
 

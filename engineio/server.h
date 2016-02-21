@@ -3,7 +3,7 @@
 
 #include <map>
 
-#include <woody/websocket/websocket_server.h>
+#include <woody/http/http_application.h>
 #include "engineio/socket.h"
 #include "engineio/transports/transport_factory.h"
 
@@ -15,59 +15,70 @@ static const char* kErrorMessage [] = {
   "Bad request"
 };
 
-class EngineIOServer : public woody::WebsocketServer {
- enum ErrorCode {
-   kUnknownTransport = 0,
-   kUnknownSid = 1,
-   kBadHandshakeMethod = 2,
-   kBadRequest = 3,
- };
+class Server : public woody::HTTPApplication {
  public:
-  EngineIOServer(int port, const std::string& name);
+  enum ErrorCode {
+    kUnknownTransport = 0,
+    kUnknownSid = 1,
+    kBadHandshakeMethod = 2,
+    kBadRequest = 3,
+  };
+  typedef boost::function<void (const SocketPtr& socket)>
+      ConnectionCallback;
+  typedef boost::function<void (const SocketPtr& socket,
+                                const std::string& data)>
+      MessageCallback;
+  Server(const std::string& name);
 
-  virtual ~EngineIOServer() { }
-  // Implement the base class virtual function
-  // Called When http request come
-  virtual void OnRequest(const woody::WebsocketHandlerPtr& handler, 
-                         const woody::HTTPRequest& req);
-  // Implement the base class virtual function
-  // Called When Websocket text message come
-  virtual void OnWebsocketTextMessage(
-      const woody::WebsocketHandlerPtr& handler, const woody::TextMessage&);
+  virtual ~Server() { }
+
+  virtual void HandleRequest(const woody::HTTPHandlerPtr& handler,
+                             const woody::HTTPRequest& req,
+                             woody::HTTPResponse& resp);
  
-  // TODO how to differ function name for On_Messgae from transport and socket;
-  // Called when ping message was parsed from transport
-  virtual void OnPingMessage(const EngineIOSocketPtr&, const std::string& data) { }
-  // Called when text message was parsed from transport
-  virtual void OnMessage(const EngineIOSocketPtr&, const std::string& data) = 0;
+  void SetConnectionCallback(const ConnectionCallback& cb) {
+    connection_callback_ = cb;
+  } 
+  void SetMessageCallback(const MessageCallback& cb) {
+    message_callback_ = cb;
+  }
+  void SetPingMessageCallback(const MessageCallback& cb) {
+    ping_message_callback_ = cb;
+  }
 
  private:
-  bool VerifyRequest(const woody::WebsocketHandlerPtr& handler,
-                     const woody::HTTPRequest& req);
+  // Called when ping message was parsed from transport
+  void OnPingMessage(const SocketPtr&, const std::string& data);
+  // Called when text message was parsed from transport
+  void OnMessage(const SocketPtr& socket, const std::string& data);
+
+  bool VerifyRequest(const woody::HTTPHandlerPtr& handler,
+                     const woody::HTTPRequest& req,
+                     woody::HTTPResponse& resp);
   // Handshake a new client
-  // If successfully, a new EngineIOSocket will be newed;
-  void Handshake(const std::string& transport_name,
+  // If successfully, a new Socket will be created.
+  void Handshake(const woody::HTTPHandlerPtr& handler,
                  const woody::HTTPRequest& req,
-                 const woody::WebsocketHandlerPtr& handler);
+                 woody::HTTPResponse& resp,
+                 const std::string& transport_name);
   // Send error message to client
-  void HandleRequestError(const woody::WebsocketHandlerPtr& handler,
+  void HandleRequestError(const woody::HTTPHandlerPtr& handler,
                           const woody::HTTPRequest& req,
+                          woody::HTTPResponse& resp,
                           ErrorCode code);
 
-  void OnHandlerClose(const woody::WebsocketHandlerPtr& handler);
+  void OnSocketClose(const SocketPtr& socket);
 
-  void OnSocketClose(const EngineIOSocketPtr& socket);
-
-  std::string cookie_;  // prefix of cookie
+  std::string cookie_prefix_;  // prefix of cookie
   int pingInterval_;   // ms
   int pingTimeout_;
   // {sid : socket}
   // for http request to find its sockets
-  std::map<std::string, EngineIOSocketPtr> sockets_;
-  // {handlerPtr : socket}
-  // for websocket
-  std::map<std::string, EngineIOSocketPtr> ws_sockets_;
-  EngineIOTransports transports_;
+  std::map<std::string, SocketPtr> sockets_;
+  Transports transports_;
+  MessageCallback message_callback_;
+  MessageCallback ping_message_callback_;
+  ConnectionCallback connection_callback_;
 };
 }
 

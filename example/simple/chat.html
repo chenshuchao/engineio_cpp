@@ -1,61 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <link href="static/css/style.css" rel="stylesheet">
-    <script type="text/javascript" src="static/jquery-1.6.1.min.js"></script>
-    <script type="text/javascript" src="static/engine.io.js"></script>
-    <script>
-        var socket = new eio.Socket('ws://10.211.55.6:5011/');
-        socket.on('open', function(){
-          $("#chat").addClass("connected");
-          $("#chat").addClass("nickname-set");
-          socket.on('message', function(data){
-            $('#lines').append($('<p>').append($('<em>').text(data)));
-            console.log(data);
-          });
-          socket.on('close', function(){});
-        });
-        function message (from, msg) {
-            $('#lines').append($('<p>').append($('<b>').text(from), msg));
-        } 
-        // DOM manipulation
-        $(function () {
-            $('#send-message').submit(function () {
-        	    message('me', $('#message').val());
-                // TODO
-        	    socket.send($('#message').val());
-        	    clear();
-        	    $('#lines').get(0).scrollTop = 10000000;
-        	    return false;
-            });
-        
-            function clear () {
-                $('#message').val('').focus();
-            };
-        });
-  </script>
+    <title>EIO Latency</title>
+    <link rel="stylesheet" href="/static/style.css" />
   </head>
+  <body>
+    <h1>EIO Latency <span id="latency"></span></h1>
+    <h2 id="transport">(connecting)</h2>
+    <canvas id="chart" height="200"></canvas>
 
-<body>
-  <div id="chat">
-    <div id="nickname">
-      <form id="set-nickname" class="wrap">
-        <p>Please type in your nickname and press enter.</p>
-        <input id="nick">
-        <p id="nickname-err">Nickname already in use</p>
-    </form>
-    </div>
-    <div id="connecting">
-      <div class="wrap">Connecting to socket.io server</div>
-    </div>
-    <div id="messages">
-      <div id="nicknames"><span>Online:</span></div>
-      <div id="lines"></div>
-    </div>
-    <form id="send-message">
-      <input id="message">
-      <button>Send</button>
-    </form>
-  </div>
-</body>
+<!--
+    <script src="/static/jquery-1.6.1.min.js"></script>
+    <script src="/static/engine.io.js"></script>
+-->
+    <script src="/static/index.js"></script>
+  </body>
 </html>

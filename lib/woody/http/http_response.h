@@ -29,7 +29,10 @@ class HTTPResponse {
   std::string GetBody() const { return body_; }
 
   std::string ToString() const;
+
   void End();
+
+  void CleanUp();
 
  private:
   // TODO
@@ -41,6 +44,7 @@ class HTTPResponse {
   std::map<std::string, std::string> headers_map_;
   std::string body_;
 };
+typedef boost::shared_ptr<HTTPResponse> HTTPResponsePtr;
 }
 
 #endif

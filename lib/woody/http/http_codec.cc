@@ -27,7 +27,7 @@ void HTTPCodec::InitParserSettings() {
   kParserSettings.on_header_field = HTTPCodec::OnHeaderFieldCallback;
   kParserSettings.on_header_value = HTTPCodec::OnHeaderValueCallback;
   kParserSettings.on_headers_complete = HTTPCodec::OnHeadersCompleteCallback;
-  //kParserSettings.on_body = HTTPCodec::OnBodyCallback;
+  kParserSettings.on_body = HTTPCodec::OnBodyCallback;
   kParserSettings.on_message_complete = HTTPCodec::OnMessageCompleteCallback;
 // kParserSettings.on_chunk_header = HTTPCodec::OnChunkHeaderCallback;
  // kParserSettings.on_chunk_complete = HTTPCodec::OnChunkCompleteCallback;
@@ -118,6 +118,11 @@ bool HTTPCodec::OnHeadersComplete() {
   return true;
 }
 
+bool HTTPCodec::OnBody(const char* buf, size_t len) {
+  request_.SetBody(string(buf, len));
+  return true;
+}
+
 bool HTTPCodec::OnMessageComplete() {
   //LOG_INFO << "HTTPCodec::OnMessageComplete [" << name_ << "].";
   if (message_complete_callback_) {
@@ -164,6 +169,14 @@ int HTTPCodec::OnHeaderValueCallback(http_parser *parser, const char* buf, size_
 int HTTPCodec::OnHeadersCompleteCallback(http_parser *parser) {
   HTTPCodec* codec = static_cast<HTTPCodec*>(parser->data);
   if (!codec->OnHeadersComplete()) {
+    return 1;
+  }
+  return 0;
+}
+
+int HTTPCodec::OnBodyCallback(http_parser *parser, const char* buf, size_t len) {
+  HTTPCodec* codec = static_cast<HTTPCodec*>(parser->data);
+  if (!codec->OnBody(buf, len)) {
     return 1;
   }
   return 0;

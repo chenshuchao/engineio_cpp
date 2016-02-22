@@ -37,7 +37,7 @@ void HTTPServer::OnRequest(const HTTPHandlerPtr& handler,
        it ++) {
     if (IsStringBeginWith(req.GetUrl(), (*it).first)) {
       LOG_DEBUG << "LALA : url:" << req.GetUrl()
-                << "prefix:" << (*it).first;
+          << "prefix:" << (*it).first;
       (*it).second->HandleRequest(handler, req, resp);
       break;
     }

@@ -27,10 +27,6 @@ class WebsocketTransport : public BaseTransport {
 
   virtual void OnError();
 
-  virtual void OnClose() {
-    // do nothing
-  }
-
   virtual void ForceClose() {
     handler_->ForceClose();
   }
@@ -40,6 +36,22 @@ class WebsocketTransport : public BaseTransport {
 
   void OnTextMessage(const woody::WebsocketHandlerPtr& handler,
                      const woody::TextMessage& message);
+
+  void OnBinaryMessage(const woody::WebsocketHandlerPtr& handler,
+                       const woody::BinaryMessage& message);
+ 
+  void OnCloseMessage(const woody::WebsocketHandlerPtr& handler,
+                      const woody::CloseMessage& message);
+  
+  void OnPingMessage(const woody::WebsocketHandlerPtr& handler,
+                     const woody::PingMessage& message) {
+  }
+
+  void OnPongMessage(const woody::WebsocketHandlerPtr& handler,
+                     const woody::PongMessage& message) {
+  }
+
+  virtual void OnClose();
 
   woody::WebsocketHandlerPtr handler_;
   bool writable_;

@@ -1,6 +1,7 @@
 #include "engineio/transports/websocket.h"
 
 #include <woody/base/string_util.h>
+#include <muduo/base/Logging.h>
 
 using namespace std;
 using namespace woody;
@@ -23,6 +24,17 @@ void WebsocketTransport::HandleRequest(const HTTPHandlerPtr& handler,
       handler_->HandleUpgrade(handler, req, resp)) {
     handler_->SetTextMessageCallback(
       boost::bind(&WebsocketTransport::OnTextMessage, this, _1, _2));
+    handler_->SetBinaryMessageCallback(
+      boost::bind(&WebsocketTransport::OnBinaryMessage, this, _1, _2));
+    handler_->SetCloseMessageCallback(
+      boost::bind(&WebsocketTransport::OnCloseMessage, this, _1, _2));
+    handler_->SetPingMessageCallback(
+      boost::bind(&WebsocketTransport::OnPingMessage, this, _1, _2));
+    handler_->SetPongMessageCallback(
+      boost::bind(&WebsocketTransport::OnPongMessage, this, _1, _2));
+    handler_->SetCloseCallback(
+      boost::bind(&WebsocketTransport::OnClose, this));
+
     return;
   }
 
@@ -53,5 +65,22 @@ void WebsocketTransport::OnData(const string& data) {
 
 void WebsocketTransport::OnTextMessage(const WebsocketHandlerPtr& handler,
                                        const TextMessage& message) {
+  LOG_DEBUG << message.GetData();
   OnData(message.GetData());
 }
+
+void WebsocketTransport::OnBinaryMessage(const WebsocketHandlerPtr& handler,
+                                       const BinaryMessage& message) {
+  LOG_DEBUG << message.GetData();
+  OnData(message.GetData());
+}
+
+void WebsocketTransport::OnCloseMessage(const WebsocketHandlerPtr& handler,
+                                        const CloseMessage& message) {
+  OnClose();  
+}
+
+void WebsocketTransport::OnClose() {
+  BaseTransport::OnClose();
+}
+

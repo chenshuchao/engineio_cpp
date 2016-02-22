@@ -33,6 +33,7 @@ class PollingTransport : public BaseTransport {
   }
 
   virtual void OnClose() {
+    BaseTransport::OnClose();
   }
 
   woody::HTTPResponse GetResponse() const {
@@ -46,6 +47,7 @@ class PollingTransport : public BaseTransport {
 
   virtual void OnData(const std::string& data);
 
+  woody::HTTPRequestPtr req_;
   woody::HTTPResponse resp_;
   bool writable_;
 };

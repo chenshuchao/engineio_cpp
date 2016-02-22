@@ -14,7 +14,7 @@ bool IsStringEndWith(string s, string p) {
 
 class FileApp : public HTTPApplication {
  public:
-  FileApp() : root_("/home/shuchao/Documents/github/engineio_cpp/example/simple") {
+  FileApp() : root_("/home/shuchao/Documents/github/engineio_cpp/example/chat") {
   }
   virtual ~FileApp() { }
 
@@ -53,7 +53,7 @@ class FileApp : public HTTPApplication {
 };
 
 void HandleMessage(const engineio::SocketPtr& socket, const string& data) {
-  socket->SendMessage("pong");
+  socket->SendMessage(data + " from server.");
 }
 
 int main() {

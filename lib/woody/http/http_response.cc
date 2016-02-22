@@ -62,6 +62,13 @@ void HTTPResponse::End() {
    handler_->Send(ToString());
 }
 
+void HTTPResponse::CleanUp() {
+  status_code_ = 0;
+  status_message_.clear();
+  headers_map_.clear();
+  body_.clear();
+}
+
 void HTTPResponse::Format() {
   AddHeader("Content-Length", int_to_string(body_.size()));
 }

@@ -25,6 +25,10 @@ class HTTPRequest {
 
   std::string GetUrl() const { return url_; }
 
+  void SetBody(const std::string& body) { body_ = body; }
+
+  std::string GetBody() const { return body_; }
+
   bool IsUpgrade() const { return is_upgrade_; }
 
   void SetUpgrade() { is_upgrade_ = true; }

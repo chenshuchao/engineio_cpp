@@ -8,8 +8,10 @@
 namespace engineio {
 class Parser {
  public:
-  static void DecodePacket(const std::string& data, Packet& packet);
-  static void DecodeBase64Packet(const std::string& data, Packet& packet) { }
+  static bool DecodePacket(const std::string& data, Packet& packet);
+  static bool DecodeBase64Packet(const std::string& data, Packet& packet) { }
+  static bool DecodePayload(const std::string& data, std::vector<Packet>& packets);
+  static bool DecodePayloadAsBinary(const std::string& data, std::vector<Packet>& packets);
 
   static void EncodePacket(const Packet& packet, bool is_bianry, std::string& data);
 

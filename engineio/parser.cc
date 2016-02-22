@@ -5,25 +5,40 @@ using namespace std;
 using namespace engineio;
 using namespace woody;
 
-void Parser::DecodePacket(const string& data, Packet& packet) {
-  if (!data.size()) return;
+bool Parser::DecodePacket(const string& data, Packet& packet) {
+  if (!data.size()) return true;
 
   if (data[0] == 'b') {
-    DecodeBase64Packet(data.substr(1), packet);
-    return;
+    return DecodeBase64Packet(data.substr(1), packet);
   }
 
   int type = data[0] - '0';
   // TODO  UTF-8
   if (!Packet::IsValidPacketType(type)) {
     // error
-    return;
+    return false;
   }
   packet.SetType(type);
   if (data.size() > 1) {
     packet.SetData(data.substr(1));
   }
-  return;
+  return true;
+}
+
+bool Parser::DecodePayload(const string& data, vector<Packet>& packets) {
+}
+
+bool Parser::DecodePayloadAsBinary(const string& data, vector<Packet>& packets) {
+  string d(data);
+  string s;
+  for (int i = 1; ; i ++) {
+    if (d[i] == 255) break;
+    s.append(d, i, 1);
+    // 310 = char length of Number.MAX_VALUE
+    if (s.size() > 310) return false;
+  }
+  return true;
+
 }
 
 void Parser::EncodePacket(const Packet& packet, bool support_binary, string& result) {

@@ -47,6 +47,8 @@ class HTTPCodec {
 
   bool OnHeadersComplete();
 
+  bool OnBody(const char* buf, size_t len);
+
   bool OnMessageComplete();
 
   /* TODO delete?

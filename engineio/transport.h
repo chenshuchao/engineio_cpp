@@ -15,6 +15,7 @@ class BaseTransport {
   typedef boost::function<void (const Packet&)>
       PacketCompleteCallback;
   typedef boost::function<void ()> TriggerFlushCallback;
+  typedef boost::function<void ()> CloseCallback;
   BaseTransport(const std::string& name)
       : name_(name),
         is_support_binary_(false) {
@@ -30,7 +31,9 @@ class BaseTransport {
   // Send engineio packet to transport
   virtual void SendPackets(std::vector<Packet>& packets) = 0;
 
-  virtual void OnClose() = 0;
+  virtual void OnClose() {
+    close_callback_();
+  }
 
   virtual void ForceClose() = 0;
 
@@ -46,6 +49,9 @@ class BaseTransport {
   }
   void SetTriggerFlushCallback(const TriggerFlushCallback& cb) {
     trigger_flush_callback_ = cb;
+  }
+  void SetCloseCallback(const CloseCallback& cb) {
+    close_callback_ = cb;
   }
 
   std::string GetName() const { return name_; }
@@ -66,6 +72,7 @@ class BaseTransport {
   bool is_support_binary_;
   PacketCompleteCallback packet_complete_callback_;
   TriggerFlushCallback trigger_flush_callback_;
+  CloseCallback close_callback_;
 };
 typedef boost::shared_ptr<BaseTransport> BaseTransportPtr;
 }

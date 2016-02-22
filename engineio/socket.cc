@@ -31,6 +31,7 @@ void Socket::SetTransport(const BaseTransportPtr& tran) {
   tran->SetPacketCompleteCallback(
       boost::bind(&Socket::OnPacket, this, _1));
   tran->SetTriggerFlushCallback(boost::bind(&Socket::Flush, this));
+  tran->SetCloseCallback(boost::bind(&Socket::OnClose, this));
 }
 
 void Socket::OnPacket(const Packet& packet) {
@@ -43,11 +44,18 @@ void Socket::OnPacket(const Packet& packet) {
       vector<Packet> packets;
       packets.push_back(packet);
       upgrading_transport_->SendPackets(packets);
+      
+      Packet cur_p;
+      cur_p.SetType(Packet::kPacketNoop);
+      vector<Packet> cur_ps;
+      cur_ps.push_back(cur_p);
+      transport_->SendPackets(cur_ps);
       //TODO reset timer
     } else if (Packet::kPacketUpgrade == packet.GetType() &&
                state_ != kStateClose) {
       upgraded_ = true;
       transport_ = upgrading_transport_;
+      state_ = kStateOpen;
       upgrading_transport_.reset();
     } else {
       upgrading_transport_->ForceClose();

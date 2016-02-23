@@ -57,9 +57,9 @@ void Server::Handshake(const HTTPHandlerPtr& handler,
   SocketPtr socket(new Socket(sid, tran));
   socket->SetCloseCallbackWithThis(
       boost::bind(&Server::OnSocketClose, this, _1));
-  socket->SetMessagePacketCallback(
+  socket->SetMessageCallback(
       boost::bind(&Server::OnMessage, this, _1, _2));
-  socket->SetPingPacketCallback(
+  socket->SetPingCallback(
       boost::bind(&Server::OnPingMessage, this, _1, _2));
   sockets_[sid] = socket;
 

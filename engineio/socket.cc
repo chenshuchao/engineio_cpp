@@ -118,11 +118,11 @@ void Socket::OnClose() {
 
 void Socket::OnPingPacket(const Packet& packet) {
   CreateAndSendPacket(Packet::kPacketPong, "");
-  ping_packet_callback_(shared_from_this(), packet.GetData());
+  ping_callback_(shared_from_this(), packet.GetData());
 }
 
 void Socket::OnMessagePacket(const Packet& packet) {
-  message_packet_callback_(shared_from_this(), packet.GetData());
+  message_callback_(shared_from_this(), packet.GetData());
 }
 
 void Socket::OnUpgradePacket(const Packet& packet) {

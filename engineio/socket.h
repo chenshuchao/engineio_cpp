@@ -14,9 +14,9 @@ class Socket : public boost::enable_shared_from_this<Socket> {
   typedef boost::function<void (const SocketPtr&)> CloseCallbackWithThis;
   typedef boost::function<void ()> CloseCallback;
   typedef boost::function<void (const SocketPtr&, const std::string&)>
-      PingPacketCallback;
+      PingCallback;
   typedef boost::function<void (const SocketPtr&, const std::string&)>
-      MessagePacketCallback;
+      MessageCallback;
   enum State {
     kStateOpening,
     kStateOpen,
@@ -42,11 +42,11 @@ class Socket : public boost::enable_shared_from_this<Socket> {
   void SetCloseCallbackWithThis(const CloseCallbackWithThis& cb) {
     close_callback_with_this_ = cb;
   }
-  void SetMessagePacketCallback(const MessagePacketCallback& cb) {
-    message_packet_callback_ = cb;
+  void SetMessageCallback(const MessageCallback& cb) {
+    message_callback_ = cb;
   }
-  void SetPingPacketCallback(const PingPacketCallback& cb) {
-    ping_packet_callback_ = cb;
+  void SetPingCallback(const PingCallback& cb) {
+    ping_callback_ = cb;
   }
 
   void HandleRequest(const woody::HTTPHandlerPtr& handler,
@@ -91,8 +91,8 @@ class Socket : public boost::enable_shared_from_this<Socket> {
   CloseCallback close_callback_;
   CloseCallbackWithThis close_callback_with_this_;
   
-  PingPacketCallback ping_packet_callback_;
-  MessagePacketCallback message_packet_callback_;
+  PingCallback ping_callback_;
+  MessageCallback message_callback_;
   bool upgraded_;
  
   // TODO

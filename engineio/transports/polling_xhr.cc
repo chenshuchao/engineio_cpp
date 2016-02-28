@@ -1,10 +1,12 @@
 #include "engineio/transports/polling_xhr.h"
+#include <bytree/logging.hpp>
 
 using namespace std;
 using namespace woody;
 using namespace engineio;
 
 void PollingXhrTransport::DoWrite(const string& data) {
+  LOG(DEBUG) << "PollingXhrTransport::DoWrite - data: " << data;
   HTTPResponse resp = PollingTransport::GetResponse();
   resp.SetStatus(200, "OK");
   if (IsSupportBinary()) {
@@ -14,5 +16,6 @@ void PollingXhrTransport::DoWrite(const string& data) {
   }
   resp.AddBody(data);
   resp.End();
+  CleanUp();
 }
 

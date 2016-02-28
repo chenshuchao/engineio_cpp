@@ -11,7 +11,8 @@ class PollingTransport : public BaseTransport {
                    const woody::HTTPRequest& req,
                    woody::HTTPResponse& resp)
       : BaseTransport("polling"),
-        resp_(resp) {
+        resp_(resp),
+        writable_(false) {
   }
   virtual ~PollingTransport() { }
 
@@ -38,6 +39,11 @@ class PollingTransport : public BaseTransport {
 
   woody::HTTPResponse GetResponse() const {
     return resp_;
+  }
+
+  void CleanUp() {
+    resp_.CleanUp();
+    req_.reset();
   }
  private:
   void HandlePollRequest(const woody::HTTPRequest& req,

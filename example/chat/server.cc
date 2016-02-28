@@ -1,7 +1,8 @@
+#define LOG_LEVEL DEBUG
 #include <fstream>
 #include <string>
 
-#include <muduo/base/Logging.h>
+#include <bytree/logging.hpp>
 #include <woody/http/http_server.h>
 #include <engineio/server.h>
 
@@ -14,7 +15,7 @@ bool IsStringEndWith(string s, string p) {
 
 class FileApp : public HTTPApplication {
  public:
-  FileApp() : root_("/home/shuchao/Documents/github/engineio_cpp/example/chat") {
+  FileApp(const string& root) : root_(root) {
   }
   virtual ~FileApp() { }
 
@@ -22,8 +23,8 @@ class FileApp : public HTTPApplication {
                              const HTTPRequest& req,
                              HTTPResponse& resp) {
     string url = req.GetUrl();
-    if (url == "/chat.html" || url.find("/static/") == 0) {
-      string abs_url = root_ + "/" + url;
+    if (url == "/index.html" || url.find("/static/") == 0) {
+      string abs_url = root_ + url;
       ifstream ifs(abs_url.c_str());
       string content((std::istreambuf_iterator<char>(ifs)),
                           (std::istreambuf_iterator<char>()));
@@ -47,22 +48,25 @@ class FileApp : public HTTPApplication {
     resp.SetStatus(404, "Not Found");
     resp.End();
   }
-
   private:
    string root_;
 };
 
 void HandleMessage(const engineio::SocketPtr& socket, const string& data) {
-  socket->SendMessage(data + " from server.");
+  socket->SendMessage("From server: " + data);
 }
 
-int main() {
-  muduo::Logger::setLogLevel(muduo::Logger::DEBUG);
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    LOG(ERROR) << "Program needs more params.";
+    return 1;
+  }
+
+  string root_path(argv[1]);
+  FileApp file_app(root_path);
 
   engineio::Server eio_server("EngineIOServer");
   eio_server.SetMessageCallback(boost::bind(&HandleMessage, _1, _2));
-
-  FileApp file_app;
 
   HTTPServer http_server(5011, "SimpleServer");
   http_server.Handle("/engine.io", &eio_server);

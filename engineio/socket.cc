@@ -1,5 +1,5 @@
 #include "engineio/socket.h"
-#include <muduo/base/Logging.h>
+#include <bytree/logging.hpp>
 
 using namespace std;
 using namespace woody;
@@ -18,10 +18,8 @@ void Socket::HandleRequest(const woody::HTTPHandlerPtr& handler,
                            const woody::HTTPRequest& req,
                            woody::HTTPResponse& resp) {
   if(req.IsUpgrade()) {
-    LOG_DEBUG << "Http request upgrade.";
-        // Set state upgrading, waiting for upgrading packet.
-    if (MaybeUpgrade(handler, req, resp)) {
-    }
+    LOG(DEBUG) << "Socket::HandleRequest - HTTP request upgrade.";
+    MaybeUpgrade(handler, req, resp);
     return;
   }
   transport_->HandleRequest(handler, req, resp);
@@ -35,34 +33,7 @@ void Socket::SetTransport(const BaseTransportPtr& tran) {
 }
 
 void Socket::OnPacket(const Packet& packet) {
-  if (state_ == kStateUpgrading) {
-    if (Packet::kPacketPing == packet.GetType() &&
-        "probe" == packet.GetData()) {
-      Packet packet;
-      packet.SetType(Packet::kPacketPong);
-      packet.SetData("probe");
-      vector<Packet> packets;
-      packets.push_back(packet);
-      upgrading_transport_->SendPackets(packets);
-      
-      Packet cur_p;
-      cur_p.SetType(Packet::kPacketNoop);
-      vector<Packet> cur_ps;
-      cur_ps.push_back(cur_p);
-      transport_->SendPackets(cur_ps);
-      //TODO reset timer
-    } else if (Packet::kPacketUpgrade == packet.GetType() &&
-               state_ != kStateClose) {
-      upgraded_ = true;
-      transport_ = upgrading_transport_;
-      state_ = kStateOpen;
-      upgrading_transport_.reset();
-    } else {
-      upgrading_transport_->ForceClose();
-    }
-    return;
-  }
-
+  LOG(DEBUG) << "Socket::OnPacket - type: " << packet.GetType();
   int packet_type = packet.GetType();
   switch (packet_type) {
     case Packet::kPacketClose: {
@@ -80,10 +51,33 @@ void Socket::OnPacket(const Packet& packet) {
   }
 }
 
+void Socket::OnPacketWhenUpgrading(const Packet& packet) {
+  if (Packet::kPacketPing == packet.GetType() &&
+      "probe" == packet.GetData()) {
+    Packet packet;
+    packet.SetType(Packet::kPacketPong);
+    packet.SetData("probe");
+    vector<Packet> packets;
+    packets.push_back(packet);
+    upgrading_transport_->SendPackets(packets);
+  
+    CreateAndSendPacket(Packet::kPacketNoop, "");
+    //TODO reset timer
+  } else if (Packet::kPacketUpgrade == packet.GetType() &&
+             state_ != kStateClose) {
+    upgraded_ = true;
+    transport_ = upgrading_transport_;
+    SetTransport(transport_);
+  } else {
+    upgrading_transport_->ForceClose();
+  }
+  return;
+}
+
 bool Socket::MaybeUpgrade(const HTTPHandlerPtr& handler,
                           const HTTPRequest& req,
                           HTTPResponse& resp) {
-  if (upgraded_) return false;
+  //if (upgraded_) return false;
   //TODO set upgrade timeout
   string sid, transport;
   req.GetGETParams("sid", sid);
@@ -92,11 +86,11 @@ bool Socket::MaybeUpgrade(const HTTPHandlerPtr& handler,
   // Get server transports
   BaseTransportFactoryPtr factory = transports_.GetFactory(transport);
   BaseTransportPtr tran(factory->Create(handler, req, resp));
-  SetTransport(tran);
   tran->HandleRequest(handler, req, resp);
   upgrading_transport_ = tran;
+  upgrading_transport_->SetPacketCompleteCallback(
+      boost::bind(&Socket::OnPacketWhenUpgrading, this, _1));
 
-  state_ = kStateUpgrading;
   return true;
 }
 
@@ -126,17 +120,14 @@ void Socket::OnMessagePacket(const Packet& packet) {
 }
 
 void Socket::OnUpgradePacket(const Packet& packet) {
-  if (state_ == kStateUpgrading) {
-    return;
-  }
 }
 
 void Socket::CreateAndSendPacket(int packet_type, const string& data) {
-  LOG_DEBUG << "Socket::SendPacket, packet_type: " << packet_type;
+  LOG(DEBUG) << "Socket::SendPacket, packet_type: " << packet_type;
   Packet packet;
   // TODO unnecessary ?
   if (!packet.SetType(packet_type)) {
-    LOG_ERROR << "Socket::SendPacket - "
+    LOG(ERROR) << "Socket::SendPacket - "
               << " Unknown packet type : " << packet_type;
     return;
   }
@@ -149,14 +140,16 @@ void Socket::CreateAndSendPacket(int packet_type, const string& data) {
 
 void Socket::Flush() {
   // TODO multiple threads unsafe?
-  // if (kStateClose != state_ && transport_->IsWritable() &&
-  if (kStateClose != state_ &&
+    if (kStateClose != state_ && transport_->IsWritable() &&
       !write_buffer_.empty()) {
+    LOG(DEBUG) << "Socket::Flush - Successfully flush.";
     // Lock
     vector<Packet> packets = write_buffer_;
     write_buffer_.clear();
     // unlock
     transport_->SendPackets(packets);
+  } else {
+    LOG(DEBUG) << "Socket::Flush - No ready for flushing.";
   }
 }
 

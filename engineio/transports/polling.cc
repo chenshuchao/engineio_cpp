@@ -1,6 +1,6 @@
 #include "engineio/transports/polling.h"
 
-#include <muduo/base/Logging.h>
+#include <bytree/logging.hpp>
 
 using namespace std;
 using namespace woody;
@@ -10,6 +10,7 @@ void PollingTransport::SendPackets(vector<Packet>& packets) {
   string data;
   Parser::EncodePayload(packets, BaseTransport::IsSupportBinary(), data);
   DoWrite(data);
+  writable_ = false;
 }
 
 void PollingTransport::HandleRequest(const HTTPHandlerPtr& handler,
@@ -33,25 +34,25 @@ void PollingTransport::OnData(const std::string& data) {
 
 void PollingTransport::HandlePollRequest(const HTTPRequest& req,
                                          HTTPResponse& resp) {
+  LOG(DEBUG) << "PollingTransport::HandlePollRequest";
   // TODO req resp constructor function
   if (req_ != NULL) {
-    LOG_DEBUG << "Request overlap.";
+    LOG(ERROR) << "Request overlap.";
     // OnError
     resp.SetStatus(500, "Internal server error");
     resp.End();
     return;
   }
   req_ = HTTPRequestPtr(new HTTPRequest(req));
-  resp_ = resp; 
+  resp_ = resp;
+  writable_ = true;
   TriggerFlush();
-  req_.reset();
-  resp_.CleanUp();
 }
 
 void PollingTransport::HandleDataRequest(const HTTPRequest& req,
                                          HTTPResponse& resp) {
   if (req_ != NULL) {
-    LOG_DEBUG << "Request overlap.";
+    LOG(DEBUG) << "Request overlap.";
     // OnError
     resp.SetStatus(500, "Internal server error");
     resp.End();

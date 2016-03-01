@@ -1,5 +1,5 @@
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-ADD_EXECUTABLE(simple server.cc)
-TARGET_LINK_LIBRARIES(simple engineio)
+ADD_EXECUTABLE(latency server.cc)
+TARGET_LINK_LIBRARIES(latency engineio)
 

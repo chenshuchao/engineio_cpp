@@ -8,6 +8,15 @@ using namespace std;
 using namespace bytree;
 using namespace engineio;
 
+int BinaryStringToInt(string& s) {
+  int sum = 0;
+  for (unsigned int i = 0, size = s.size(); i < size; i ++) {
+    int t = static_cast<int>(static_cast<unsigned char>(s[i]));
+    sum = sum * 10 + t;
+  }
+  return sum;
+}
+
 bool Parser::DecodePacket(const string& data, Packet& packet) {
   if (!data.size()) return true;
 
@@ -15,7 +24,12 @@ bool Parser::DecodePacket(const string& data, Packet& packet) {
     return DecodeBase64Packet(data.substr(1), packet);
   }
 
-  int type = data[0] - '0';
+  int type;
+  if (data[0] > '0') {
+    type = data[0] - '0';
+  } else {
+    type = data[0];
+  }
   // TODO  UTF-8
   if (!Packet::IsValidPacketType(type)) {
     // error
@@ -53,7 +67,7 @@ bool Parser::DecodePayload(const string& data, vector<Packet>& packets) {
         LOG(ERROR) << "Parser::DecodePayload - Packet length can't be empty.";
         return false;
       }
-      unsigned int len = StringToInt(len_str);
+      unsigned int len = BinaryStringToInt(len_str);
       string msg(data, i+1, len);
       if (msg.size() != len) {
         LOG(ERROR) << "Parser::DecodePayload - Packet length conflict.";
@@ -79,29 +93,44 @@ bool Parser::DecodePayload(const string& data, vector<Packet>& packets) {
 }
 
 bool Parser::DecodePayloadAsBinary(const string& data, vector<Packet>& packets) {
-  string s;
-  int i = 0, j = 0;
-  int size = data.size();
+  unsigned int i = 0, j = 0;
+  unsigned int size = data.size();
   string len_str;
+
+  LOG(DEBUG) << "Parser::DecodePayloadAsBinary - i: " << i << ", size: " << size;
+  for (unsigned int k = 0; k < size; k ++) {
+    LOG(DEBUG) << "data[" << k << "]: " << data[k] << ", ";
+  }
   while(i < size) {
-    if (data[i] == 255) {
+    LOG(DEBUG) << "Parser::DecodePayloadAsBinary - In while.";
+    if ((unsigned char)data[i] != 255) {
+      i ++;
+    } else {
       len_str = string(data, j+1, i-j-1);
-      unsigned int len = StringToInt(len_str);
-      string single(data, i+1, len);
-      if (single.size() != len) {
+      // 310 = char length of Number.MAX_VALUE
+      if (len_str.size() > 310) {
+        LOG(ERROR) << "Parser::DecodePayloadAsBinary - Packet length too long.";
         return false;
       }
-      // 310 = char length of Number.MAX_VALUE
-      if (s.size() > 310) return false;
+      unsigned int len = BinaryStringToInt(len_str);
 
+      string single(data, i+1, len);
+      if (single.size() != len) {
+        LOG(ERROR) << "Parser::DecodePayloadAsBinary - Packet length conflict.";
+        return false;
+      }
+     
       Packet packet;
       DecodePacket(single, packet);
+      LOG(DEBUG) << "Packet type: " << packet.GetType() << ", body: " << packet.GetBody();
       packets.push_back(packet);
-      j = i + 1;
+      i += len + 1;
+      j = i;
     } 
-    i ++;
   }
+
   if (i != j) {
+    LOG(ERROR) << "Parser::DecodePayloadAsBinary - Data is incomplete.";
     return false;
   }
   return true;

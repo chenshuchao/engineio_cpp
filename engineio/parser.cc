@@ -1,9 +1,12 @@
 #include "engineio/parser.h"
-#include "woody/base/string_util.h"
+
+#include <bytree/logging.hpp>
+#include <bytree/string_util.hpp>
+#include <bytree/ssl_util.hpp>
 
 using namespace std;
+using namespace bytree;
 using namespace engineio;
-using namespace woody;
 
 bool Parser::DecodePacket(const string& data, Packet& packet) {
   if (!data.size()) return true;
@@ -20,37 +23,94 @@ bool Parser::DecodePacket(const string& data, Packet& packet) {
   }
   packet.SetType(type);
   if (data.size() > 1) {
-    packet.SetData(data.substr(1));
+    packet.SetBody(data.substr(1));
   }
   return true;
 }
 
 // TODO
 bool Parser::DecodeBase64Packet(const string& data, Packet& packet) {
-  return false;
+  if (0 == data.size()) return false;
+  packet.SetType(data[0]-'0');
+  string decoded = Base64Decode(data.substr(1));
+  packet.SetBody(decoded);
+  return true;
 }
 
 bool Parser::DecodePayload(const string& data, vector<Packet>& packets) {
-  return false;
+  if (!(data[0] == 'b' || data[0] > '0')) {
+    return DecodePayloadAsBinary(data, packets);
+  }
+  int i = 0, j = 0;
+  int size = data.size();
+  string len_str;
+  while(i < size) {
+    if (data[i] != ':') {
+      i ++;
+    } else {
+      len_str = string(data, j, i-j);
+      if (len_str.empty()) {
+        LOG(ERROR) << "Parser::DecodePayload - Packet length can't be empty.";
+        return false;
+      }
+      unsigned int len = StringToInt(len_str);
+      string msg(data, i+1, len);
+      if (msg.size() != len) {
+        LOG(ERROR) << "Parser::DecodePayload - Packet length conflict.";
+        return false;
+      }
+      if (!msg.empty()) {
+        Packet packet;
+        if (!DecodePacket(msg, packet)) {
+          LOG(ERROR) << "Parser::DecodePayload - DecodePacket Error.";
+          return false;
+        }
+        packets.push_back(packet);
+      }
+      i += len + 1;
+      j = i;
+    }
+  }
+  if (i != j) {
+    LOG(ERROR) << "Parser::DecodePayload - Data is incomplete.";
+    return false;
+  }
+  return true;
 }
 
 bool Parser::DecodePayloadAsBinary(const string& data, vector<Packet>& packets) {
-  string d(data);
   string s;
-  for (int i = 1; ; i ++) {
-    if (d[i] == 255) break;
-    s.append(d, i, 1);
-    // 310 = char length of Number.MAX_VALUE
-    if (s.size() > 310) return false;
+  int i = 0, j = 0;
+  int size = data.size();
+  string len_str;
+  while(i < size) {
+    if (data[i] == 255) {
+      len_str = string(data, j+1, i-j-1);
+      unsigned int len = StringToInt(len_str);
+      string single(data, i+1, len);
+      if (single.size() != len) {
+        return false;
+      }
+      // 310 = char length of Number.MAX_VALUE
+      if (s.size() > 310) return false;
+
+      Packet packet;
+      DecodePacket(single, packet);
+      packets.push_back(packet);
+      j = i + 1;
+    } 
+    i ++;
+  }
+  if (i != j) {
+    return false;
   }
   return true;
-
 }
 
 void Parser::EncodePacket(const Packet& packet, bool support_binary, string& result) {
   int type = packet.GetType();
-  result.append(int_to_string(type));
-  result.append(packet.GetData()); 
+  result.append(IntToString(type));
+  result.append(packet.GetBody()); 
 }
 
 void Parser::EncodePayload(vector<Packet>& packets, bool support_binary, string& result) {
@@ -63,7 +123,7 @@ void Parser::EncodePayload(vector<Packet>& packets, bool support_binary, string&
        it ++) {
     string r;
     EncodePacket(*it, false, r);
-    result += int_to_string(r.size()) + ":" + r;
+    result += IntToString(r.size()) + ":" + r;
   }
 }
 
@@ -73,7 +133,7 @@ void Parser::EncodePayloadAsBinary(vector<Packet>& packets, string& result) {
        it ++) {
     string d;
     EncodePacket(*it, true, d);
-    string encoding_len = int_to_string(d.size());
+    string encoding_len = IntToString(d.size());
     int buf_size = encoding_len.size() + 2;
     string buf(buf_size, '0');
     buf[0] = 0;

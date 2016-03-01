@@ -3,15 +3,13 @@
 #include <string>
 
 #include <bytree/logging.hpp>
+#include <bytree/string_util.hpp>
 #include <woody/http/http_server.h>
 #include <engineio/server.h>
 
 using namespace std;
+using namespace bytree;
 using namespace woody;
-
-bool IsStringEndWith(string s, string p) {
-  return s.find(p) == (s.size() - p.size());
-}
 
 class FileApp : public HTTPApplication {
  public:
@@ -29,11 +27,11 @@ class FileApp : public HTTPApplication {
       string content((std::istreambuf_iterator<char>(ifs)),
                           (std::istreambuf_iterator<char>()));
       string content_type;
-      if (IsStringEndWith(url, ".js")) {
+      if (EndsWith(url, ".js")) {
         content_type = "application/javascript";
-      } else if (IsStringEndWith(url, ".css")) {
+      } else if (EndsWith(url, ".css")) {
         content_type = "text/css";
-      } else if (IsStringEndWith(url, ".swf")) {
+      } else if (EndsWith(url, ".swf")) {
         content_type = "application/x-shockwave-flash";
       } else {
         content_type = "text/html";

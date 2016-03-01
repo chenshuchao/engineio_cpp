@@ -42,6 +42,10 @@ class Server : public woody::HTTPApplication {
     ping_message_callback_ = cb;
   }
 
+  void SetPathPrefix(const std::string& prefix) {
+    path_prefix_ = prefix;
+  }
+
   void SetCookiePrefix(const std::string& prefix) {
     cookie_prefix_ = prefix;
   }
